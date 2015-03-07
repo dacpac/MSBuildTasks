@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0" DefaultTargets="Pubish">
+
+  <UsingTask TaskName="GetModelPostDeployChecksumsDacpac" AssemblyFile="C:\Build\SSDTCustomTasks\CustomTasks.dll" />
+  <UsingTask TaskName="GetModelPostDeployChecksumsServer" AssemblyFile="C:\Build\SSDTCustomTasks\CustomTasks.dll" />
+
+  <PropertyGroup>
+    <SqlPackagePath>C:\Program Files (x86)\Microsoft SQL Server\120\DAC\bin\SqlPackage.exe</SqlPackagePath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ServerName>SQLLIMITED\SQLDOTLIMITED</ServerName>
+    <DatabaseName>AdventureWorksModelPostDeploy</DatabaseName>
+    <dacpac>C:\Build\$(DatabaseName)\$(DatabaseName).dacpac</dacpac>
+    <TableName>ChecksumLog</TableName>
+    <TableSchemaName>dbo</TableSchemaName>
+    <ColumnIdName>id</ColumnIdName>
+    <ColumnModelChecksumName>model_uri_checksum</ColumnModelChecksumName>
+    <ColumnPostDeployChecksumName>post_deploy_uri_checksum</ColumnPostDeployChecksumName>
+  </PropertyGroup>
+
+  <Target Name="output">
+    <!-- Get's the model.xml and predeploy.sql files checksums stored in the origin.xml file -->
+    <GetModelPostDeployChecksumsDacpac DacpacFile="$(dacpac)" >
+      <Output PropertyName="ModelChecksumDacpac" TaskParameter="ModelChecksum" />
+      <Output PropertyName="PostDeployChecksumDacpac" TaskParameter="PostDeployChecksum" />
+    </GetModelPostDeployChecksumsDacpac>
+
+    <!-- Get's the model uri checksum stored on a server if it exists-->
+    <GetModelPostDeployChecksumsServer ServerName="$(ServerName)"
+                                       DatabaseName="$(DatabaseName)"
+                                       TableName="$(TableName)"
+                                       TableSchemaName="$(TableSchemaName)"
+                                       ColumnIdName="$(ColumnIdName)"
+                                       ColumnModelChecksumName="$(ColumnModelChecksumName)"
+                                       ColumnPostDeployChecksumName="$(ColumnPostDeployChecksumName)">
+
+      <Output PropertyName="ModelChecksumServer" TaskParameter="ModelChecksum" />
+      <Output PropertyName="PostDeployChecksumServer" TaskParameter="PostDeployChecksum" />
+    </GetModelPostDeployChecksumsServer>
+
+    <Message Text="ModelChecksumDacpac from task: $(ModelChecksumDacpac)" />
+    <Message Text="ModelChecksumServer from task: $(ModelChecksumServer)" />
+
+    <Message Text="PostDeployChecksumDacpac from task: $(PostDeployChecksumDacpac)" />
+    <Message Text="PostDeployChecksumServer from task: $(PostDeployChecksumServer)" />
+
+  </Target>
+
+  <Target Name="Publish"
+          DependsOnTargets="output">
+
+    <Exec Command="&quot;$(SqlPackagePath)&quot; /Action:Publish /SourceFile:&quot;$(dacpac)&quot; /TargetServerName:&quot;$(ServerName)&quot; /TargetDatabaseName:&quot;$(DatabaseName)&quot; /v:ModelUriChecksum=$(ModelChecksumDacpac) /v:PostDeployUriChecksum=$(PostDeployChecksumDacpac)"
+          Condition="'$(ModelChecksumDacpac)' != '$(ModelChecksumServer)' OR '$(PostDeployChecksumDacpac)' != '$(PostDeployChecksumServer)'"
+          />
+  </Target>
+
+</Project>
